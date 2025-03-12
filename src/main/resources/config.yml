@@ -1,0 +1,35 @@
+# TimeTuner Configuration
+# Version: 1.0.0
+
+# =====================================================
+# Base time multipliers (1.0 = vanilla speed)
+# =====================================================
+day-speed: 0.5
+night-speed: 1.0
+
+# =====================================================
+# World-specific overrides
+# =====================================================
+worlds:
+  world:
+    day-speed: 0.30
+    night-speed: 0.5
+    enabled: true
+  world_nether:
+    enabled: false
+  world_the_end:
+    enabled: false
+
+
+# =====================================================
+# Safety features
+# =====================================================
+overflow-protection: true
+precision-mode: true
+
+# =====================================================
+# Advanced settings
+# =====================================================
+tick-frequency: 1       # How often to update time (in ticks, 1-20)
+debug-mode: false       # Enables verbose logging
+auto-pause-empty: false # Pause time when server is empty

@@ -1,0 +1,61 @@
+name: TimeTuner
+version: 1.0.0
+main: me.summykai.timetuner.TimeTuner
+api-version: 1.21
+authors: [summykai]
+description: A sophisticated time management plugin for Minecraft Paper servers offering precise control over day/night cycles with production-grade reliability and intuitive commands.
+website: https://github.com/summykai/timetuner
+
+commands:
+  timetuner:
+    description: Master command for TimeTuner plugin
+    aliases: [tt]
+    usage: /<command> [reload|pause|speed|status|worlds|reset|worldspeed|help]
+    permission: timetuner.use
+
+permissions:
+  timetuner.use:
+    description: Access to basic commands
+    default: true
+    children:
+      timetuner.status: true
+      timetuner.worlds: true
+
+  timetuner.admin:
+    description: Full configuration access
+    default: op
+    children:
+      timetuner.use: true
+      timetuner.reload: true
+      timetuner.pause: true
+      timetuner.speed: true
+      timetuner.reset: true
+      timetuner.worldspeed: true
+
+  timetuner.reload:
+    description: Allows reloading TimeTuner configuration
+    default: op
+
+  timetuner.pause:
+    description: Allows pausing/resuming time progression
+    default: op
+
+  timetuner.speed:
+    description: Allows changing global time speeds
+    default: op
+
+  timetuner.status:
+    description: Allows viewing plugin status
+    default: true
+
+  timetuner.worlds:
+    description: Allows listing managed worlds
+    default: true
+
+  timetuner.reset:
+    description: Allows resetting world times
+    default: op
+
+  timetuner.worldspeed:
+    description: Allows changing world-specific speeds
+    default: op
