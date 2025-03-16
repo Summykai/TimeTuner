@@ -6,7 +6,7 @@
 
     <groupId>me.summykai</groupId>
     <artifactId>TimeTuner</artifactId>
-    <version>1.0.0-paper</version>
+    <version>1.1.0-paper</version>
 
     <properties>
         <maven.compiler.source>21</maven.compiler.source>

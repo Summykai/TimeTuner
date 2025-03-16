@@ -1,11 +1,14 @@
 package me.summykai.timetuner.listeners;
 
+import org.bukkit.World;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.Listener;
 import org.bukkit.event.world.WorldLoadEvent;
 import org.bukkit.event.world.WorldUnloadEvent;
+
 import me.summykai.timetuner.TimeTuner;
 import me.summykai.timetuner.time.WorldTimeManager;
+import me.summykai.timetuner.utils.ErrorHandler;
 
 public class WorldListener implements Listener {
     private final TimeTuner plugin;
@@ -16,24 +19,41 @@ public class WorldListener implements Listener {
 
     @EventHandler
     public void onWorldLoad(WorldLoadEvent event) {
-        String worldName = event.getWorld().getName();
-        boolean enabled = plugin.getConfig().getBoolean("worlds." + worldName + ".enabled", false);
-        
-        if (enabled && !plugin.getWorldManagers().containsKey(event.getWorld().getUID())) {
-            double daySpeed = plugin.getConfig().getDouble("worlds." + worldName + ".day-speed", plugin.getDaySpeed());
-            double nightSpeed = plugin.getConfig().getDouble("worlds." + worldName + ".night-speed", plugin.getNightSpeed());
-            
-            plugin.getWorldManagers().put(event.getWorld().getUID(),
-                new WorldTimeManager(plugin, event.getWorld(), daySpeed, nightSpeed));
-            
-            if (plugin.isDebugMode()) {
-                plugin.getLogger().info("Automatically initialized manager for newly loaded world: " + worldName);
-            }
+        World world = event.getWorld();
+        if (plugin.isDebugMode()) {
+            plugin.getLogger().info(
+                String.format(
+                    "World '%s' loaded, checking configuration",
+                    world.getName()
+                )
+            );
+        }
+
+        try {
+            plugin.initializeWorldManager(world);
+        } catch (Exception e) {
+            ErrorHandler.logPluginError(
+                "Failed to initialize world manager",
+                e
+            );
         }
     }
 
     @EventHandler
     public void onWorldUnload(WorldUnloadEvent event) {
-        plugin.removeWorldManager(event.getWorld().getUID());
+        World world = event.getWorld();
+        WorldTimeManager manager = plugin.getWorldManagers().get(world.getUID());
+        
+        if (manager != null) {
+            if (plugin.isDebugMode()) {
+                plugin.getLogger().info(
+                    String.format(
+                        "World '%s' unloaded, removing manager",
+                        world.getName()
+                    )
+                );
+            }
+            plugin.getWorldManagers().remove(world.getUID());
+        }
     }
 }

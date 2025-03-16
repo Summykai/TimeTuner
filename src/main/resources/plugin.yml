@@ -1,5 +1,5 @@
 name: TimeTuner
-version: 1.0.0
+version: 1.1.0
 main: me.summykai.timetuner.TimeTuner
 api-version: 1.21
 authors: [summykai]
@@ -10,27 +10,27 @@ commands:
   timetuner:
     description: Master command for TimeTuner plugin
     aliases: [tt]
-    usage: /<command> [reload|pause|speed|status|worlds|reset|worldspeed|help]
-    permission: timetuner.use
+    usage: /<command> [reload|pause|resume|speed|status|reset|help]
+    permission: timetuner.admin
 
 permissions:
   timetuner.use:
     description: Access to basic commands
-    default: true
+    default: false
     children:
       timetuner.status: true
-      timetuner.worlds: true
+      timetuner.help: true
 
   timetuner.admin:
     description: Full configuration access
     default: op
     children:
-      timetuner.use: true
       timetuner.reload: true
       timetuner.pause: true
+      timetuner.resume: true
       timetuner.speed: true
       timetuner.reset: true
-      timetuner.worldspeed: true
+      timetuner.use: true
 
   timetuner.reload:
     description: Allows reloading TimeTuner configuration
@@ -38,6 +38,10 @@ permissions:
 
   timetuner.pause:
     description: Allows pausing/resuming time progression
+    default: op
+    
+  timetuner.resume:
+    description: Allows resuming time progression
     default: op
 
   timetuner.speed:
@@ -48,14 +52,10 @@ permissions:
     description: Allows viewing plugin status
     default: true
 
-  timetuner.worlds:
-    description: Allows listing managed worlds
+  timetuner.help:
+    description: Allows viewing help information
     default: true
 
   timetuner.reset:
     description: Allows resetting world times
-    default: op
-
-  timetuner.worldspeed:
-    description: Allows changing world-specific speeds
     default: op

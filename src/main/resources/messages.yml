@@ -1,13 +1,19 @@
 # TimeTuner Localized Messages
-# Version: 1.0.0
+# Version: 1.1.0
 
 # =====================================================
 # Plugin Messages
 # =====================================================
 plugin:
   prefix: "&7[&bTimeTuner&7] "
-  enable: "&aTimeTuner v1.0.0 has been enabled!"
+  enable: "&aTimeTuner v1.1.0 has been enabled!"
   disable: "&cTimeTuner has been disabled."
+
+# =====================================================
+# Sleep Messages
+# =====================================================
+sleep:
+  skipped: "&aEnough players have slept. The night has been skipped."
 
 # =====================================================
 # Error Messages
@@ -22,6 +28,7 @@ errors:
   general-error: "&cAn error occurred while executing the command."
   config-error: "&cError in configuration. Please check the console for details."
   negative-value: "&cTime speeds must be positive values."
+  no-managed-worlds: "&cNo managed worlds to affect."
 
 # =====================================================
 # Command Messages
@@ -31,8 +38,15 @@ commands:
     success: "&aConfiguration has been reloaded successfully!"
     error: "&cFailed to reload configuration. Please check the console for details."
   pause:
-    paused: "&eTime has been &bpaused&e in all worlds."
-    resumed: "&aTime has been &bresumed&a in all worlds."
+    global:
+      success: "&eTime has been &bpaused&e in all managed worlds."
+    world:
+      success: "&eTime has been &bpaused&e in world &b{world}&e."
+  resume:
+    global:
+      success: "&aTime has been &bresumed&a in all managed worlds."
+    world:
+      success: "&aTime has been &bresumed&a in world &b{world}&a."
   speed:
     success: "&aTime speeds updated: Day={day}, Night={night}"
     error: "&cCould not update time speeds. Please check the console for details."
@@ -42,6 +56,7 @@ commands:
     night-speed: "&eNight Speed: &b{speed}"
     paused: "&ePaused: &b{state}"
     world-count: "&eManaged Worlds: &b{count}"
+    world: "&e- World: &b{world} &e| Day: &b{day_speed} &e| Night: &b{night_speed} &e| Time: &b{time} &e| Day: &b{is_day} &e| Paused: &b{paused}"
     world-settings-header: "&6=== World-Specific Settings ==="
     world-settings-item: "&e- {world}: &bDay {day} / Night {night}"
   worlds:
@@ -58,7 +73,8 @@ commands:
     header: "&6=== TimeTuner Commands ==="
     command-format: "&e/{command} {args} &7- {description}"
     reload: "reload &7- Reload the plugin configuration"
-    pause: "pause &7- Toggle time progression in all worlds"
+    pause: "pause [world] &7- Pause time progression in all worlds or a specific world"
+    resume: "resume [world] &7- Resume time progression in all worlds or a specific world"
     speed: "speed <day> <night> &7- Set global time speeds"
     status: "status &7- Display current plugin status"
     worlds: "worlds &7- List all managed worlds"

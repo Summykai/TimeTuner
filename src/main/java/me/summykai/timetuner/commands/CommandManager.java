@@ -1,8 +1,8 @@
 package me.summykai.timetuner.commands;
 
 import org.bukkit.World;
-import org.bukkit.GameRule;
 import org.bukkit.command.CommandSender;
+
 import me.summykai.timetuner.TimeTuner;
 import me.summykai.timetuner.time.WorldTimeManager;
 import me.summykai.timetuner.utils.ErrorHandler;
@@ -17,269 +17,252 @@ public class CommandManager {
         this.messageManager = messageManager;
     }
 
-    public boolean handleReload(CommandSender sender) {
-        if (!sender.hasPermission("timetuner.reload")) {
-            messageManager.sendMessage(sender, "errors.no-permission");
-            return false;
-        }
-        
-        try {
-            plugin.reloadConfigValues();
-            plugin.initializeWorldManagers();
-            messageManager.sendMessage(sender, "commands.reload.success");
-            return true;
-        } catch (Exception e) {
-            ErrorHandler.logPluginError("Failed to reload configuration", e);
-            ErrorHandler.logCommandError(sender, "Failed to reload configuration");
-            return false;
-        }
-    }
-
-    public boolean handlePause(CommandSender sender) {
-        if (!sender.hasPermission("timetuner.pause")) {
-            messageManager.sendMessage(sender, "errors.no-permission");
-            return false;
-        }
-        
-        try {
-            boolean newState = !plugin.isTimePaused();
-            plugin.setTimePaused(newState);
-            String key = newState ? "commands.pause.paused" : "commands.pause.resumed";
-            messageManager.sendMessage(sender, key);
-            return true;
-        } catch (Exception e) {
-            ErrorHandler.logPluginError("Failed to toggle pause state", e);
-            ErrorHandler.logCommandError(sender, "Failed to toggle pause");
-            return false;
-        }
-    }
-
-    public boolean handleSpeed(CommandSender sender, String[] args) {
-        if (!sender.hasPermission("timetuner.speed")) {
-            messageManager.sendMessage(sender, "errors.no-permission");
-            return false;
-        }
-        
-        if (args.length < 3) {
-            messageManager.sendMessage(sender, "commands.speed.usage");
-            return false;
-        }
-
-        try {
-            double day = Double.parseDouble(args[1]);
-            double night = Double.parseDouble(args[2]);
-            
-            if (day < 0 || night < 0 || !Double.isFinite(day) || !Double.isFinite(night)) {
-                messageManager.sendMessage(sender, "errors.negative-value");
-                return false;
+    public boolean handleCommand(CommandSender sender, String[] args) {
+        if (args.length == 0) {
+            if (!sender.hasPermission("timetuner.use")) {
+                ErrorHandler.logCommandError(sender, "You don't have permission for this command");
+                return true;
             }
+            return handleStatus(sender);
+        }
 
-            // Use the new updateGlobalSpeeds method which handles config updates and runtime component updates
-            plugin.updateGlobalSpeeds(day, night);
-            
-            messageManager.sendMessage(sender, "commands.speed.success", 
-                messageManager.placeholders("day", String.valueOf(day), "night", String.valueOf(night)));
+        String subCommand = args[0].toLowerCase();
+        String permission = getPermission(subCommand);
+        
+        if (!sender.hasPermission(permission)) {
+            ErrorHandler.logCommandError(sender, "You don't have permission for this command");
             return true;
-        } catch (NumberFormatException e) {
-            messageManager.sendMessage(sender, "errors.invalid-number");
-            return false;
-        } catch (Exception e) {
-            ErrorHandler.logPluginError("Failed to set speeds", e);
-            messageManager.sendMessage(sender, "commands.speed.error");
-            return false;
+        }
+
+        if (plugin.isDebugMode()) {
+            plugin.getLogger().info(() -> String.format(
+                "Processing command '%s' from %s",
+                subCommand,
+                sender.getName()
+            ));
+        }
+        
+        switch (subCommand) {
+            case "reload":
+                return handleReload(sender);
+            case "pause":
+                return handlePause(sender, args);
+            case "resume":
+                return handleResume(sender, args);
+            case "speed":
+                return handleSpeed(sender, args);
+            case "reset":
+                return handleReset(sender, args);
+            case "help":
+                return handleHelp(sender);
+            case "status":
+                return handleStatus(sender);
+            default:
+                ErrorHandler.logCommandError(sender, "Unknown command: " + subCommand);
+                return false;
+        }
+    }
+
+    private String getPermission(String command) {
+        switch (command) {
+            case "help":
+            case "status":
+                return "timetuner.use";
+            case "pause":
+            case "resume":
+                return "timetuner.pause";
+            default:
+                return "timetuner." + command;
         }
     }
 
     public boolean handleStatus(CommandSender sender) {
-        if (!sender.hasPermission("timetuner.status")) {
-            messageManager.sendMessage(sender, "errors.no-permission");
-            return false;
-        }
+        messageManager.sendFeedback(sender, "commands.status.header");
         
-        try {
-            // Log actual values for debugging
-            plugin.getLogger().info("Status command - Debug Values:");
-            plugin.getLogger().info("Global Day Speed: " + plugin.getDaySpeed());
-            plugin.getLogger().info("Global Night Speed: " + plugin.getNightSpeed());
-            plugin.getLogger().info("Paused: " + plugin.isTimePaused());
-            plugin.getLogger().info("World Manager Count: " + plugin.getWorldManagers().size());
-            
-            // Log world-specific settings
-            plugin.getWorldManagers().values().forEach(manager -> {
-                String worldName = manager.getWorld().getName();
-                plugin.getLogger().info("World '" + worldName + "' settings - Day: " + 
-                    manager.getDaySpeed() + ", Night: " + manager.getNightSpeed());
-            });
-            
-            messageManager.sendMessage(sender, "commands.status.header");
-            messageManager.sendMessage(sender, "commands.status.day-speed", 
-                messageManager.placeholders("speed", String.valueOf(plugin.getDaySpeed())));
-            messageManager.sendMessage(sender, "commands.status.night-speed", 
-                messageManager.placeholders("speed", String.valueOf(plugin.getNightSpeed())));
-            messageManager.sendMessage(sender, "commands.status.paused", 
-                messageManager.placeholders("state", String.valueOf(plugin.isTimePaused())));
-            messageManager.sendMessage(sender, "commands.status.world-count", 
-                messageManager.placeholders("count", String.valueOf(plugin.getWorldManagers().size())));
-            
-            // Add world-specific status information
-            if (!plugin.getWorldManagers().isEmpty()) {
-                messageManager.sendMessage(sender, "commands.status.world-settings-header");
-                plugin.getWorldManagers().values().forEach(manager -> {
-                    String worldName = manager.getWorld().getName();
-                    messageManager.sendMessage(sender, "commands.status.world-settings-item",
-                        messageManager.placeholders(
-                            "world", worldName,
-                            "day", String.valueOf(manager.getDaySpeed()),
-                            "night", String.valueOf(manager.getNightSpeed())
-                        ));
-                });
+        for (World world : plugin.getServer().getWorlds()) {
+            WorldTimeManager manager = plugin.getWorldManagers().get(world.getUID());
+            if (manager != null) {
+                messageManager.sendFeedback(sender, "commands.status.world",
+                    "world", world.getName(),
+                    "day_speed", String.format("%.2f", manager.getDaySpeed()),
+                    "night_speed", String.format("%.2f", manager.getNightSpeed()),
+                    "is_day", String.valueOf(manager.isDay()),
+                    "paused", String.valueOf(manager.isPaused()),
+                    "time", String.valueOf(world.getTime())
+                );
             }
-            return true;
-        } catch (Exception e) {
-            ErrorHandler.logPluginError("Failed to show status", e);
-            messageManager.sendMessage(sender, "commands.status.failure");
-            return false;
-        }
-    }
-
-    public boolean handleWorlds(CommandSender sender) {
-        if (!sender.hasPermission("timetuner.worlds")) {
-            messageManager.sendMessage(sender, "errors.no-permission");
-            return false;
         }
         
-        try {
-            messageManager.sendMessage(sender, "commands.worlds.header");
-            plugin.getWorldManagers().values().forEach(manager -> {
-                String status = manager.getWorld().getGameRuleValue(GameRule.DO_DAYLIGHT_CYCLE) ? "&a✔" : "&c✖";
-                messageManager.sendMessage(sender, "commands.worlds.world-item", 
-                    messageManager.placeholders(
-                        "world", manager.getWorld().getName(),
-                        "status", status
-                    ));
-            });
-            return true;
-        } catch (Exception e) {
-            ErrorHandler.logPluginError("Failed to list worlds", e);
-            messageManager.sendMessage(sender, "commands.worlds.error");
-            return false;
-        }
+        return true;
     }
 
-    public boolean handleReset(CommandSender sender) {
-        if (!sender.hasPermission("timetuner.reset")) {
-            messageManager.sendMessage(sender, "errors.no-permission");
-            return false;
-        }
-        
-        try {
-            plugin.resetWorldTimes();
-            messageManager.sendMessage(sender, "commands.reset.success");
-            return true;
-        } catch (Exception e) {
-            ErrorHandler.logPluginError("Failed to reset times", e);
-            messageManager.sendMessage(sender, "commands.reset.failure");
-            return false;
-        }
+    public boolean handleReload(CommandSender sender) {
+        plugin.reloadConfigValues();
+        messageManager.sendFeedback(sender, "commands.reload.success");
+        return true;
     }
 
-    public boolean handleWorldSpeed(CommandSender sender, String[] args) {
-        if (!sender.hasPermission("timetuner.worldspeed")) {
-            messageManager.sendMessage(sender, "errors.no-permission");
-            return false;
-        }
-        
-        if (args.length < 4) {
-            messageManager.sendMessage(sender, "commands.worldspeed.usage");
-            return false;
-        }
-
-        try {
+    public boolean handlePause(CommandSender sender, String[] args) {
+        if (args.length > 1) {
             String worldName = args[1];
-            
-            // Validate that the world exists
             World world = plugin.getServer().getWorld(worldName);
             if (world == null) {
-                messageManager.sendMessage(sender, "errors.invalid-world", 
-                    messageManager.placeholders("world", worldName));
+                ErrorHandler.logCommandError(sender, "World not found: " + worldName);
                 return false;
             }
             
-            // In Bukkit API, if getWorld() returns a non-null value, the world is already loaded
-            // Let's make sure the world is also properly initialized with chunks loaded
-            if (!world.isChunkLoaded(0, 0)) {
-                messageManager.sendMessage(sender, "errors.world-not-loaded",
-                    messageManager.placeholders("world", worldName));
+            WorldTimeManager manager = plugin.getWorldManagers().get(world.getUID());
+            if (manager == null) {
+                ErrorHandler.logCommandError(sender, "World not managed: " + worldName);
                 return false;
             }
             
-            double day = Double.parseDouble(args[2]);
-            double night = Double.parseDouble(args[3]);
+            manager.setPaused(true);
+            messageManager.sendFeedback(sender, "commands.pause.world.success", "world", worldName);
+        } else {
+            // Pause all worlds
+            long pausedCount = plugin.getWorldManagers().values().stream()
+                .peek(manager -> manager.setPaused(true))
+                .count();
+            if (pausedCount > 0) {
+                messageManager.sendFeedback(sender, "commands.pause.global.success");
+            } else {
+                messageManager.sendFeedback(sender, "errors.no-managed-worlds");
+            }
+        }
+        return true;
+    }
+
+    public boolean handleResume(CommandSender sender, String[] args) {
+        if (args.length > 1) {
+            String worldName = args[1];
+            World world = plugin.getServer().getWorld(worldName);
+            if (world == null) {
+                ErrorHandler.logCommandError(sender, "World not found: " + worldName);
+                return false;
+            }
             
-            if (day < 0 || night < 0 || !Double.isFinite(day) || !Double.isFinite(night)) {
-                messageManager.sendMessage(sender, "errors.negative-value");
+            WorldTimeManager manager = plugin.getWorldManagers().get(world.getUID());
+            if (manager == null) {
+                ErrorHandler.logCommandError(sender, "World not managed: " + worldName);
+                return false;
+            }
+            
+            manager.setPaused(false);
+            messageManager.sendFeedback(sender, "commands.resume.world.success", "world", worldName);
+        } else {
+            // Resume all worlds
+            long resumedCount = plugin.getWorldManagers().values().stream()
+                .peek(manager -> manager.setPaused(false))
+                .count();
+            if (resumedCount > 0) {
+                messageManager.sendFeedback(sender, "commands.resume.global.success");
+            } else {
+                messageManager.sendFeedback(sender, "errors.no-managed-worlds");
+            }
+        }
+        return true;
+    }
+
+    public boolean handleSpeed(CommandSender sender, String[] args) {
+        if (args.length < 3) {
+            ErrorHandler.logCommandError(sender, "Usage: /timetuner speed <day|night|both> <speed> [world]");
+            return false;
+        }
+
+        String type = args[1].toLowerCase();
+        if (!type.equals("day") && !type.equals("night") && !type.equals("both")) {
+            ErrorHandler.logCommandError(sender, "Invalid speed type. Use: day, night, or both");
+            return false;
+        }
+
+        double speed;
+        try {
+            speed = Double.parseDouble(args[2]);
+            if (speed < 0 || speed > 20) {
+                ErrorHandler.logCommandError(sender, "Speed must be between 0 and 20");
+                return false;
+            }
+        } catch (NumberFormatException e) {
+            ErrorHandler.logCommandError(sender, "Invalid speed value");
+            return false;
+        }
+
+        WorldTimeManager manager = null;
+        String worldName = null;
+
+        if (args.length > 3) {
+            worldName = args[3];
+            World world = plugin.getServer().getWorld(worldName);
+            if (world == null) {
+                ErrorHandler.logCommandError(sender, "World not found: " + worldName);
                 return false;
             }
 
-            // Update config, save to disk, and update world manager immediately
-            updateWorldConfig(worldName, day, night);
-            
-            messageManager.sendMessage(sender, "commands.worldspeed.success", 
-                messageManager.placeholders("world", worldName, "day", String.valueOf(day), "night", String.valueOf(night)));
-            return true;
-        } catch (NumberFormatException e) {
-            messageManager.sendMessage(sender, "errors.invalid-number");
-            return false;
-        } catch (Exception e) {
-            ErrorHandler.logPluginError("Failed to set world speeds", e);
-            messageManager.sendMessage(sender, "commands.worldspeed.error");
-            return false;
+            manager = plugin.getWorldManagers().get(world.getUID());
+            if (manager == null) {
+                ErrorHandler.logCommandError(sender, "World not managed: " + worldName);
+                return false;
+            }
         }
-    }
-    
-    /**
-     * Updates a world's configuration values, saves them to disk, and updates the runtime world manager.
-     * 
-     * @param worldName The name of the world to update
-     * @param daySpeed The new day speed value
-     * @param nightSpeed The new night speed value
-     */
-    private void updateWorldConfig(String worldName, double daySpeed, double nightSpeed) {
-        // Update config in memory
-        plugin.getConfig().set("worlds." + worldName + ".day-speed", daySpeed);
-        plugin.getConfig().set("worlds." + worldName + ".night-speed", nightSpeed);
-        plugin.getConfig().set("worlds." + worldName + ".enabled", true); // Ensure enabled
-        
-        // Save to disk
-        plugin.saveConfig();
-        
-        World world = plugin.getServer().getWorld(worldName);
-        if (world == null) return;
-        
-        // Add new manager if not present
-        if (!plugin.getWorldManagers().containsKey(world.getUID())) {
-            WorldTimeManager manager = new WorldTimeManager(plugin, world, daySpeed, nightSpeed);
-            plugin.getWorldManagers().put(world.getUID(), manager);
+
+        final double newDaySpeed = type.equals("day") || type.equals("both") ? speed : 
+            (manager != null ? manager.getDaySpeed() : plugin.getDaySpeed());
+        final double newNightSpeed = type.equals("night") || type.equals("both") ? speed :
+            (manager != null ? manager.getNightSpeed() : plugin.getNightSpeed());
+
+        if (manager != null) {
+            // World-specific speed update
+            manager.updateSpeeds(newDaySpeed, newNightSpeed);
+            messageManager.sendFeedback(sender, "commands.speed.success",
+                "world", worldName,
+                "type", type,
+                "speed", String.format("%.2f", speed)
+            );
         } else {
-            // Update existing manager
-            plugin.getWorldManagers().get(world.getUID()).updateSpeeds(daySpeed, nightSpeed);
+            // Global speed update
+            plugin.getWorldManagers().values().forEach(mgr -> mgr.updateSpeeds(newDaySpeed, newNightSpeed));
+            messageManager.sendFeedback(sender, "commands.speed.success",
+                "type", type,
+                "speed", String.format("%.2f", speed)
+            );
         }
+
+        return true;
+    }
+
+    public boolean handleReset(CommandSender sender, String[] args) {
+        if (args.length > 1) {
+            String worldName = args[1];
+            World world = plugin.getServer().getWorld(worldName);
+            if (world == null) {
+                ErrorHandler.logCommandError(sender, "World not found: " + worldName);
+                return false;
+            }
+
+            WorldTimeManager manager = plugin.getWorldManagers().get(world.getUID());
+            if (manager == null) {
+                ErrorHandler.logCommandError(sender, "World not managed: " + worldName);
+                return false;
+            }
+
+            manager.skipToDay();
+            messageManager.sendFeedback(sender, "commands.reset.success", "world", worldName);
+        } else {
+            plugin.resetWorldTimes();
+            messageManager.sendFeedback(sender, "commands.reset.success");
+        }
+        return true;
     }
 
     public boolean handleHelp(CommandSender sender) {
-        if (!sender.hasPermission("timetuner.use")) {
-            messageManager.sendMessage(sender, "errors.no-permission");
-            return false;
-        }
-        messageManager.sendMessage(sender, "commands.help.header");
-        messageManager.sendMessage(sender, "commands.help.reload");
-        messageManager.sendMessage(sender, "commands.help.pause");
-        messageManager.sendMessage(sender, "commands.help.speed");
-        messageManager.sendMessage(sender, "commands.help.status");
-        messageManager.sendMessage(sender, "commands.help.worlds");
-        messageManager.sendMessage(sender, "commands.help.reset");
-        messageManager.sendMessage(sender, "commands.help.worldspeed");
-        messageManager.sendMessage(sender, "commands.help.help");
+        messageManager.sendFeedback(sender, "commands.help.header");
+        messageManager.sendFeedback(sender, "commands.help.reload");
+        messageManager.sendFeedback(sender, "commands.help.pause");
+        messageManager.sendFeedback(sender, "commands.help.resume");
+        messageManager.sendFeedback(sender, "commands.help.speed");
+        messageManager.sendFeedback(sender, "commands.help.reset");
+        messageManager.sendFeedback(sender, "commands.help.status");
         return true;
     }
 }

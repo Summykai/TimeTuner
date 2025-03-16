@@ -1,329 +1,322 @@
 package me.summykai.timetuner;
 
-import org.bukkit.*;
+import me.summykai.timetuner.commands.CommandManager;
+import me.summykai.timetuner.commands.TimeTunerCommandExecutor;
+import me.summykai.timetuner.listeners.PlayerListener;
+import me.summykai.timetuner.time.WorldTimeManager;
+import me.summykai.timetuner.utils.MessageManager;
+import org.bukkit.GameRule;
+import org.bukkit.World;
+import org.bukkit.configuration.ConfigurationSection;
 import org.bukkit.plugin.java.JavaPlugin;
 import org.bukkit.scheduler.BukkitRunnable;
-import org.bukkit.scheduler.BukkitTask;
-import me.summykai.timetuner.time.*;
-import me.summykai.timetuner.commands.*;
-import me.summykai.timetuner.listeners.WorldListener;
-import me.summykai.timetuner.utils.*;
-import me.summykai.timetuner.utils.ErrorHandler;
-import java.util.*;
 
-public final class TimeTuner extends JavaPlugin {
-    private final Map<UUID, WorldTimeManager> worldManagers = new HashMap<>();
-    private double daySpeed = 1.0;
-    private double nightSpeed = 1.0;
-    private boolean timePaused = false;
-    private boolean manualPaused = false;
-    private boolean autoPaused = false;
+import java.util.HashMap;
+import java.util.Map;
+import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
+
+public class TimeTuner extends JavaPlugin {
+    private final Map<UUID, WorldTimeManager> worldManagers;
+    private final Map<String, WorldConfig> worldConfigs;
+    private double daySpeed;
+    private double nightSpeed;
+    private boolean debugMode;
+    private boolean allowSleepSkip;
+    private double sleepPercentage;
+    private boolean useRequiredPlayers;
+    private int requiredPlayers;
+    private int tickFrequency;
+    private boolean autoPauseEmpty;
+    private long lastConfigReload;
+    private static final long CONFIG_RELOAD_COOLDOWN = 1000; // 1 second cooldown
+
     private MessageManager messageManager;
-    private boolean debugMode = false;
-    private int tickFrequency = 1;
-    private BukkitTask timeUpdateTask;
+    private CommandManager commandManager;
+
+    public TimeTuner() {
+        this.worldManagers = new ConcurrentHashMap<>();
+        this.worldConfigs = new ConcurrentHashMap<>();
+        this.lastConfigReload = 0;
+    }
 
     @Override
     public void onEnable() {
-        try {
-            saveDefaultConfig();
-            messageManager = new MessageManager(this);
-            reloadConfigValues();
-            initializeWorldManagers();
-            startTimeUpdateTask();
-            registerCommands();
-            
-            // Register world load listener
-            getServer().getPluginManager().registerEvents(new WorldListener(this), this);
-            
-            // Always log configuration values at startup, regardless of debug mode
-            getLogger().info("TimeTuner configuration loaded:");
-            getLogger().info("Global Day speed: " + daySpeed);
-            getLogger().info("Global Night speed: " + nightSpeed);
-            getLogger().info("Tick frequency: " + tickFrequency);
-            getLogger().info("Managed worlds: " + worldManagers.size());
-            
-            if (debugMode) {
-                getLogger().info("Debug mode enabled");
-            } else {
-                getLogger().info("TimeTuner v" + getPluginMeta().getVersion() + " enabled!");
-            }
-        } catch (Exception e) {
-            ErrorHandler.logPluginError("Failed to enable plugin", e);
-            getServer().getPluginManager().disablePlugin(this);
-        }
-    }
+        saveDefaultConfig();
+        messageManager = new MessageManager(this);
+        commandManager = new CommandManager(this, messageManager);
 
-    @Override
-    public void onDisable() {
-        try {
-            if (timeUpdateTask != null) {
-                timeUpdateTask.cancel();
-            }
-            worldManagers.clear();
-            getLogger().info("TimeTuner disabled.");
-        } catch (Exception e) {
-            ErrorHandler.logPluginError("Failed to disable plugin", e);
-        }
-    }
-
-    public void initializeWorldManagers() {
-        worldManagers.clear();
-        for (World world : getServer().getWorlds()) {
-            String worldName = world.getName();
-            
-            // Check if world is configured and enabled
-            boolean enabled = getConfig().getBoolean("worlds." + worldName + ".enabled", false);
-            if (!enabled) {
-                if (debugMode) {
-                    getLogger().info("Skipping disabled world: " + worldName);
-                }
-                continue;
-            }
-            
-            // Get world-specific speeds from config, fallback to global speeds
-            double worldDaySpeed = getConfig().getDouble("worlds." + worldName + ".day-speed", daySpeed);
-            double worldNightSpeed = getConfig().getDouble("worlds." + worldName + ".night-speed", nightSpeed);
-            
-            worldManagers.put(world.getUID(), new WorldTimeManager(this, world, worldDaySpeed, worldNightSpeed));
-            if (debugMode) {
-                getLogger().info("Initialized time manager for world: " + worldName + 
-                                " (day-speed: " + worldDaySpeed + ", night-speed: " + worldNightSpeed + ")");
-            }
-        }
-    }
-
-    private void startTimeUpdateTask() {
-        if (timeUpdateTask != null) {
-            timeUpdateTask.cancel();
-        }
-        
-        timeUpdateTask = new BukkitRunnable() {
-            @Override
-            public void run() {
-                try {
-                    boolean shouldPause = getConfig().getBoolean("auto-pause-empty", false) 
-                        && getServer().getOnlinePlayers().isEmpty();
-                    
-                    if (shouldPause != autoPaused) {
-                        setAutoPaused(shouldPause);
-                        if (debugMode) {
-                            getLogger().info("Auto-pause " + (shouldPause ? "activated" : "deactivated") + 
-                                              " due to " + (shouldPause ? "empty" : "active") + " server");
-                        }
-                    }
-                    
-                    worldManagers.values().forEach(WorldTimeManager::tick);
-                } catch (Exception e) {
-                    ErrorHandler.logPluginError("Error in time update task", e);
-                }
-            }
-        }.runTaskTimer(this, 1L, tickFrequency);
-        
-        if (debugMode) {
-            getLogger().info("Time update task started with frequency: " + tickFrequency);
-        }
-    }
-
-    private void registerCommands() {
-        CommandManager commandManager = new CommandManager(this, messageManager);
         TimeTunerCommandExecutor executor = new TimeTunerCommandExecutor(this, commandManager);
         getCommand("timetuner").setExecutor(executor);
         getCommand("timetuner").setTabCompleter(executor);
+
+        getServer().getPluginManager().registerEvents(new PlayerListener(this), this);
+
+        loadConfigValues();
+        initializeWorldManagers();
+
+        // Start time update task
+        new BukkitRunnable() {
+            @Override
+            public void run() {
+                worldManagers.values().forEach(WorldTimeManager::updateTime);
+            }
+        }.runTaskTimer(this, 0L, tickFrequency);
+    }
+
+    public void loadConfigValues() {
+        reloadConfig();
+        
+        // Load global speed settings
+        ConfigurationSection globalSpeedsSection = getConfig().getConfigurationSection("global-speeds");
+        if (globalSpeedsSection != null) {
+            daySpeed = globalSpeedsSection.getDouble("day-speed", 0.5);
+            nightSpeed = globalSpeedsSection.getDouble("night-speed", 1.0);
+        } else {
+            // Fallback for backward compatibility
+            daySpeed = getConfig().getDouble("day-speed", 0.5);
+            nightSpeed = getConfig().getDouble("night-speed", 1.0);
+        }
+        
+        // Load sleep settings
+        ConfigurationSection sleepSection = getConfig().getConfigurationSection("sleep");
+        if (sleepSection != null) {
+            allowSleepSkip = sleepSection.getBoolean("allow-skip", true);
+            sleepPercentage = sleepSection.getDouble("percentage", 0.50);
+            useRequiredPlayers = sleepSection.getBoolean("use-required-players", false);
+            requiredPlayers = sleepSection.getInt("required-players", 3);
+        } else {
+            // Fallback for backward compatibility
+            allowSleepSkip = getConfig().getBoolean("allow-sleep-skip", true);
+            sleepPercentage = getConfig().getDouble("sleep-percentage", 0.50);
+            useRequiredPlayers = getConfig().getBoolean("use-required-players", false);
+            requiredPlayers = getConfig().getInt("required-players", 3);
+        }
+        
+        // Load advanced settings
+        ConfigurationSection advancedSection = getConfig().getConfigurationSection("advanced");
+        if (advancedSection != null) {
+            tickFrequency = Math.max(1, advancedSection.getInt("tick-frequency", 1));
+            debugMode = advancedSection.getBoolean("debug-mode", false);
+            autoPauseEmpty = advancedSection.getBoolean("auto-pause-empty", false);
+        } else {
+            // Fallback for backward compatibility
+            tickFrequency = Math.max(1, getConfig().getInt("tick-frequency", 1));
+            debugMode = getConfig().getBoolean("debug-mode", false);
+            autoPauseEmpty = getConfig().getBoolean("auto-pause-empty", false);
+        }
+
+        // Load world-specific configurations
+        ConfigurationSection worldsSection = getConfig().getConfigurationSection("worlds");
+        worldConfigs.clear();
+
+        if (worldsSection != null) {
+            for (String worldName : worldsSection.getKeys(false)) {
+                ConfigurationSection worldSection = worldsSection.getConfigurationSection(worldName);
+                if (worldSection != null) {
+                    WorldConfig config = new WorldConfig(
+                        worldSection.getDouble("day-speed", daySpeed),
+                        worldSection.getDouble("night-speed", nightSpeed),
+                        worldSection.getBoolean("enabled", true)
+                    );
+                    worldConfigs.put(worldName.toLowerCase(), config);
+                }
+            }
+        }
+
+        if (debugMode) {
+            getLogger().info(() -> String.format(
+                "Loaded configuration - Day Speed: %.2f, Night Speed: %.2f, Sleep Skip: %b",
+                daySpeed, nightSpeed, allowSleepSkip
+            ));
+        }
     }
 
     public void reloadConfigValues() {
-        reloadConfig();
-        messageManager.loadMessages();
-        
-        // Store old values to detect changes
-        double oldDaySpeed = daySpeed;
-        double oldNightSpeed = nightSpeed;
-        boolean oldDebugMode = debugMode;
-        int oldTickFrequency = tickFrequency;
-        
-        // Load new values with validation
-        double newDaySpeed = Math.max(0, getConfig().getDouble("day-speed", 1.0));
-        double newNightSpeed = Math.max(0, getConfig().getDouble("night-speed", 1.0));
-        
-        // Check for NaN values
-        if (Double.isNaN(newDaySpeed)) {
-            newDaySpeed = 1.0;
+        long now = System.currentTimeMillis();
+        if (now - lastConfigReload < CONFIG_RELOAD_COOLDOWN) {
             if (debugMode) {
-                getLogger().warning("Invalid day-speed value (NaN) in config, using default: 1.0");
+                getLogger().info("Config reload skipped due to cooldown");
             }
+            return;
         }
-        if (Double.isNaN(newNightSpeed)) {
-            newNightSpeed = 1.0;
-            if (debugMode) {
-                getLogger().warning("Invalid night-speed value (NaN) in config, using default: 1.0");
-            }
-        }
-        
-        daySpeed = newDaySpeed;
-        nightSpeed = newNightSpeed;
-        
-        debugMode = getConfig().getBoolean("debug-mode", false);
-        tickFrequency = getConfig().getInt("tick-frequency", 1);
-        
-        // Validate values
-        validateSpeedValues();
-        tickFrequency = Math.max(1, Math.min(20, tickFrequency));
-        
-        // Check if we need to restart the time update task due to tick frequency change
-        if (oldTickFrequency != tickFrequency) {
-            startTimeUpdateTask();
-            if (debugMode) {
-                getLogger().info("Tick frequency changed from " + oldTickFrequency + " to " + tickFrequency);
-            }
-        }
-        
-        // Log speed changes if in debug mode
-        if (debugMode && (oldDaySpeed != daySpeed || oldNightSpeed != nightSpeed)) {
-            getLogger().info("Global speeds changed - Day: " + oldDaySpeed + " → " + daySpeed + 
-                           ", Night: " + oldNightSpeed + " → " + nightSpeed);
-        }
-        
-        // Update all world managers with new global or world-specific speeds
-        updateAllWorldManagerSpeeds();
-        
-        if (debugMode && !oldDebugMode) {
-            getLogger().info("Debug mode enabled");
-            getLogger().info("Day speed: " + daySpeed);
-            getLogger().info("Night speed: " + nightSpeed);
-            getLogger().info("Tick frequency: " + tickFrequency);
-            getLogger().info("Managed worlds: " + worldManagers.size());
-        }
-    }
 
-    /**
-     * Updates the speeds for all world managers based on the current configuration.
-     */
-    public void updateAllWorldManagerSpeeds() {
-        worldManagers.forEach((uuid, manager) -> {
+        // Preserve paused states
+        Map<UUID, Boolean> pausedStates = new HashMap<>();
+        worldManagers.forEach((id, manager) -> pausedStates.put(id, manager.isPaused()));
+
+        loadConfigValues();
+        messageManager.reloadMessages();
+
+        // Update existing world managers with new config values
+        worldManagers.forEach((id, manager) -> {
             World world = manager.getWorld();
-            String worldName = world.getName();
+            WorldConfig config = getWorldConfig(world);
+            manager.updateSpeeds(config.getDaySpeed(), config.getNightSpeed());
             
-            // Get world-specific speeds from config, fallback to global speeds
-            double worldDaySpeed = getConfig().getDouble("worlds." + worldName + ".day-speed", daySpeed);
-            double worldNightSpeed = getConfig().getDouble("worlds." + worldName + ".night-speed", nightSpeed);
-            
-            // Update the manager with the new speeds
-            manager.updateSpeeds(worldDaySpeed, worldNightSpeed);
-            
-            if (debugMode) {
-                getLogger().info("Updated speeds for world " + worldName + ": day=" + worldDaySpeed + ", night=" + worldNightSpeed);
+            // Reapply paused states
+            if (pausedStates.containsKey(id)) {
+                manager.setPaused(pausedStates.get(id));
             }
         });
+
+        lastConfigReload = now;
     }
 
-    /**
-     * Updates the global speed settings and propagates changes to all world managers.
-     * 
-     * @param newDaySpeed The new global day speed
-     * @param newNightSpeed The new global night speed
-     */
-    public void updateGlobalSpeeds(double newDaySpeed, double newNightSpeed) {
-        // Update config in memory
-        getConfig().set("day-speed", newDaySpeed);
-        getConfig().set("night-speed", newNightSpeed);
-        
-        // Save to disk
-        saveConfig();
-        
-        // Update in-memory values
-        daySpeed = newDaySpeed;
-        nightSpeed = newNightSpeed;
-        validateSpeedValues();
-        
-        // Update all world managers that don't have specific overrides
-        updateAllWorldManagerSpeeds();
-        
+    public void initializeWorldManagers() {
+        // Remove managers for unloaded worlds
+        worldManagers.entrySet().removeIf(entry -> getServer().getWorld(entry.getKey()) == null);
+
+        // Initialize or update managers for loaded worlds
+        for (World world : getServer().getWorlds()) {
+            initializeWorldManager(world);
+        }
+
         if (debugMode) {
-            getLogger().info("Updated global speeds: day=" + daySpeed + ", night=" + nightSpeed);
+            getLogger().info(() -> String.format(
+                "Initialized %d world managers with global defaults - Day: %.2f, Night: %.2f",
+                worldManagers.size(), daySpeed, nightSpeed
+            ));
         }
     }
 
-    public void updateWorldSpeed(String worldName, double daySpeed, double nightSpeed) {
-        // Update config in memory
-        if (getConfig().isConfigurationSection("worlds." + worldName)) {
-            getConfig().set("worlds." + worldName + ".day-speed", daySpeed);
-            getConfig().set("worlds." + worldName + ".night-speed", nightSpeed);
-        } else {
-            getConfig().set("worlds." + worldName + ".day-speed", daySpeed);
-            getConfig().set("worlds." + worldName + ".night-speed", nightSpeed);
-            getConfig().set("worlds." + worldName + ".enabled", true);
+    public void initializeWorldManager(World world) {
+        if (world == null) {
+            return;
         }
-        
-        // Save changes to disk
-        saveConfig();
-        
-        // Update the world manager immediately if it exists
-        worldManagers.values().stream()
-            .filter(manager -> manager.getWorld().getName().equals(worldName))
-            .findFirst()
-            .ifPresent(manager -> {
-                manager.updateSpeeds(daySpeed, nightSpeed);
-                
+
+        UUID worldId = world.getUID();
+        WorldTimeManager existingManager = worldManagers.get(worldId);
+
+        WorldConfig config = getWorldConfig(world);
+        if (!config.isEnabled()) {
+            if (existingManager != null) {
+                worldManagers.remove(worldId);
                 if (debugMode) {
-                    getLogger().info("Updated speeds for world " + worldName + ": day=" + daySpeed + ", night=" + nightSpeed);
+                    getLogger().info(() -> "Removed manager for disabled world: " + world.getName());
                 }
-            });
-    }
+            }
+            return;
+        }
 
-    private void validateSpeedValues() {
-        daySpeed = Math.max(0, daySpeed);
-        nightSpeed = Math.max(0, nightSpeed);
-    }
-
-    public double getDaySpeed() { return daySpeed; }
-    public double getNightSpeed() { return nightSpeed; }
-    public int getTickFrequency() { return tickFrequency; }
-    public MessageManager getMessageManager() { return messageManager; }
-    public boolean isDebugMode() { return debugMode; }
-
-    public boolean isTimePaused() { return timePaused; }
-    
-    public void setTimePaused(boolean paused) {
-        setManualPaused(paused);
-    }
-    
-    public void setManualPaused(boolean paused) {
-        this.manualPaused = paused;
-        updatePausedState();
-    }
-    
-    public void setAutoPaused(boolean paused) {
-        this.autoPaused = paused;
-        updatePausedState();
-    }
-    
-    private void updatePausedState() {
-        boolean newPaused = manualPaused || autoPaused;
-        if (newPaused != timePaused) {
-            timePaused = newPaused;
-            worldManagers.values().forEach(manager -> manager.setPaused(timePaused));
+        if (existingManager != null) {
+            existingManager.updateSpeeds(config.getDaySpeed(), config.getNightSpeed());
+            if (debugMode) {
+                getLogger().info(() -> String.format(
+                    "Updated manager for world %s - Day: %.2f, Night: %.2f",
+                    world.getName(), config.getDaySpeed(), config.getNightSpeed()
+                ));
+            }
+        } else {
+            // Disable vanilla daylight cycle before creating our manager
+            world.setGameRule(GameRule.DO_DAYLIGHT_CYCLE, false);
+            
+            // Initialize with configured speeds
+            WorldTimeManager manager = new WorldTimeManager(this, world, config.getDaySpeed(), config.getNightSpeed());
+            worldManagers.put(worldId, manager);
+            
+            if (debugMode) {
+                getLogger().info(() -> String.format(
+                    "Created manager for world %s - Day: %.2f, Night: %.2f, Initial time: %d",
+                    world.getName(), config.getDaySpeed(), config.getNightSpeed(), world.getTime()
+                ));
+            }
         }
     }
 
-    public Map<UUID, WorldTimeManager> getWorldManagers() {
-        return Collections.unmodifiableMap(worldManagers);
+    private WorldConfig getWorldConfig(World world) {
+        return worldConfigs.getOrDefault(
+            world.getName().toLowerCase(),
+            new WorldConfig(daySpeed, nightSpeed, true)
+        );
     }
 
     public void resetWorldTimes() {
-        worldManagers.values().forEach(WorldTimeManager::reset);
+        worldManagers.values().forEach(WorldTimeManager::skipToDay);
     }
-    
-    /**
-     * Removes a world manager for the specified world UUID.
-     * Used when a world is unloaded to prevent memory leaks.
-     * 
-     * @param worldUID The UUID of the world to remove
-     */
-    public void removeWorldManager(UUID worldUID) {
-        worldManagers.remove(worldUID);
-        if (debugMode) {
-            getLogger().info("Removed world manager for unloaded world with UUID: " + worldUID);
+
+    public Map<UUID, WorldTimeManager> getWorldManagers() {
+        return worldManagers;
+    }
+
+    public double getDaySpeed() {
+        return daySpeed;
+    }
+
+    public double getNightSpeed() {
+        return nightSpeed;
+    }
+
+    public boolean isDebugMode() {
+        return debugMode;
+    }
+
+    public boolean isAllowSleepSkip() {
+        return allowSleepSkip;
+    }
+
+    public double getSleepPercentage() {
+        return sleepPercentage;
+    }
+
+    public boolean isUseRequiredPlayers() {
+        return useRequiredPlayers;
+    }
+
+    public int getRequiredPlayers() {
+        return requiredPlayers;
+    }
+
+    public boolean isAutoPauseEmpty() {
+        return autoPauseEmpty;
+    }
+
+    public boolean isOverflowProtection() {
+        // Check safety section first, then fall back to old format
+        ConfigurationSection safetySection = getConfig().getConfigurationSection("safety");
+        if (safetySection != null) {
+            return safetySection.getBoolean("overflow-protection", true);
+        }
+        return getConfig().getBoolean("overflow-protection", true);
+    }
+
+    public int getTickFrequency() {
+        return tickFrequency;
+    }
+
+    public MessageManager getMessageManager() {
+        return messageManager;
+    }
+
+    public void updateGlobalSpeeds(double newDaySpeed, double newNightSpeed) {
+        this.daySpeed = newDaySpeed;
+        this.nightSpeed = newNightSpeed;
+        worldManagers.values().forEach(manager -> 
+            manager.updateSpeeds(newDaySpeed, newNightSpeed)
+        );
+    }
+
+    private static final class WorldConfig {
+        private final double daySpeed;
+        private final double nightSpeed;
+        private final boolean enabled;
+
+        private WorldConfig(double daySpeed, double nightSpeed, boolean enabled) {
+            this.daySpeed = daySpeed;
+            this.nightSpeed = nightSpeed;
+            this.enabled = enabled;
+        }
+
+        private double getDaySpeed() {
+            return daySpeed;
+        }
+
+        private double getNightSpeed() {
+            return nightSpeed;
+        }
+
+        private boolean isEnabled() {
+            return enabled;
         }
     }
 }

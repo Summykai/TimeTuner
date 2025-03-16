@@ -1,35 +1,70 @@
 # TimeTuner Configuration
-# Version: 1.0.0
+# Version: 1.1.0
 
 # =====================================================
-# Base time multipliers (1.0 = vanilla speed)
+# GLOBAL TIME SPEED SETTINGS
 # =====================================================
-day-speed: 0.5
-night-speed: 1.0
+# These settings apply to all worlds unless overridden
+# in the world-specific section below.
+# 
+# Values explained:
+# - 1.0 = Vanilla Minecraft speed (normal)
+# - 0.5 = Half speed (time passes at 50% of normal rate)
+# - 2.0 = Double speed (time passes twice as fast)
+# =====================================================
+global-speeds:
+  day-speed: 0.5    # Global day speed multiplier
+  night-speed: 1.0  # Global night speed multiplier
 
 # =====================================================
-# World-specific overrides
+# SLEEP SETTINGS
+# =====================================================
+sleep:
+  allow-skip: true           # Enable night skipping via sleep
+  percentage: 0.50           # Percentage of players required to skip (0.50 = 50%)
+  use-required-players: false # Use fixed player count instead of percentage
+  required-players: 3        # Number of players required when use-required-players is true
+
+# =====================================================
+# WORLD-SPECIFIC SETTINGS
+# =====================================================
+# Override global settings for specific worlds.
+# Each world can have its own:
+#   - day-speed: Custom day speed (overrides global setting)
+#   - night-speed: Custom night speed (overrides global setting)
+#   - enabled: true/false (whether time management is active)
+#
+# Note: Each world can be individually paused/resumed using commands:
+#   /timetuner pause <world>
+#   /timetuner resume <world>
 # =====================================================
 worlds:
   world:
-    day-speed: 0.30
-    night-speed: 0.5
-    enabled: true
+    day-speed: 0.30    # Overrides global day-speed for this world only
+    night-speed: 0.5   # Overrides global night-speed for this world only
+    enabled: true      # Time management is active for this world
+  
   world_nether:
-    enabled: false
+    day-speed: 1.0     # Will be used if this world is enabled
+    night-speed: 1.0   # Will be used if this world is enabled
+    enabled: false     # Time management is disabled for the nether
+  
   world_the_end:
-    enabled: false
-
-
-# =====================================================
-# Safety features
-# =====================================================
-overflow-protection: true
-precision-mode: true
+    day-speed: 1.0     # Will be used if this world is enabled
+    night-speed: 1.0   # Will be used if this world is enabled
+    enabled: false     # Time management is disabled for the end
 
 # =====================================================
-# Advanced settings
+# SAFETY FEATURES
 # =====================================================
-tick-frequency: 1       # How often to update time (in ticks, 1-20)
-debug-mode: false       # Enables verbose logging
-auto-pause-empty: false # Pause time when server is empty
+safety:
+  overflow-protection: true  # Prevents time overflow issues (recommended)
+  precision-mode: true       # Enables precise time tracking
+
+# =====================================================
+# ADVANCED SETTINGS
+# =====================================================
+advanced:
+  tick-frequency: 1       # How often to update time (in ticks, 1-20)
+  debug-mode: false       # Enables verbose logging
+  auto-pause-empty: false # Pause time when no players are in a world
