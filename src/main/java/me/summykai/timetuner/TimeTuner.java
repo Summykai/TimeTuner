@@ -117,7 +117,9 @@ public class TimeTuner extends JavaPlugin {
                     WorldConfig config = new WorldConfig(
                         worldSection.getDouble("day-speed", daySpeed),
                         worldSection.getDouble("night-speed", nightSpeed),
-                        worldSection.getBoolean("enabled", true)
+                        worldSection.getBoolean("enabled", true),
+                        worldSection.getBoolean("allow-bed-explosions", false),
+                        worldSection.getBoolean("allow-thunderstorm-sleep", true)
                     );
                     worldConfigs.put(worldName.toLowerCase(), config);
                 }
@@ -224,10 +226,10 @@ public class TimeTuner extends JavaPlugin {
         }
     }
 
-    private WorldConfig getWorldConfig(World world) {
+    public WorldConfig getWorldConfig(World world) {
         return worldConfigs.getOrDefault(
             world.getName().toLowerCase(),
-            new WorldConfig(daySpeed, nightSpeed, true)
+            new WorldConfig(daySpeed, nightSpeed, true, false, true)
         );
     }
 
@@ -296,15 +298,19 @@ public class TimeTuner extends JavaPlugin {
         );
     }
 
-    private static final class WorldConfig {
+    public static final class WorldConfig {
         private final double daySpeed;
         private final double nightSpeed;
         private final boolean enabled;
+        private final boolean allowBedExplosions;
+        private final boolean allowThunderstormSleep;
 
-        private WorldConfig(double daySpeed, double nightSpeed, boolean enabled) {
+        private WorldConfig(double daySpeed, double nightSpeed, boolean enabled, boolean allowBedExplosions, boolean allowThunderstormSleep) {
             this.daySpeed = daySpeed;
             this.nightSpeed = nightSpeed;
             this.enabled = enabled;
+            this.allowBedExplosions = allowBedExplosions;
+            this.allowThunderstormSleep = allowThunderstormSleep;
         }
 
         private double getDaySpeed() {
@@ -317,6 +323,14 @@ public class TimeTuner extends JavaPlugin {
 
         private boolean isEnabled() {
             return enabled;
+        }
+
+        public boolean isAllowBedExplosions() {
+            return allowBedExplosions;
+        }
+
+        public boolean isAllowThunderstormSleep() {
+            return allowThunderstormSleep;
         }
     }
 }

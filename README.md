@@ -11,55 +11,63 @@ This is the source code repository for the TimeTuner Minecraft plugin, a Paper s
 ## Features
 
 ### Core Features
-- **Custom Time Speeds**: Set different speeds for day and night
-- **Per-World Control**: Configure time settings for each world individually
-- **Pause/Resume**: Freeze time in specific worlds or globally
+- **Custom Time Speeds**: Set different speeds for day and night globally or per world.
+- **Per-World Control**: Configure time speeds, specific sleep rules (like bed explosions, thunderstorm sleeping), and enable/disable TimeTuner management for each world individually.
+- **Pause/Resume**: Freeze time progression in specific managed worlds or globally.
 
-### Sleep Mechanics
-- **Flexible Night Skipping**: Choose between percentage-based or fixed player count requirements
-- **Single Player Optimization**: Automatic night skip when alone
-- **World-Specific Rules**: Customize sleep settings per world
+### Sleep & World Mechanics
+- **Flexible Night Skipping**: Choose between percentage-based or fixed player count requirements for skipping the night or thunderstorms.
+- **Configurable Thunderstorm Sleeping**: Enable or disable the vanilla behavior allowing players to sleep during thunderstorms on a per-world basis (defaults to enabled).
+- **Configurable Bed Explosions**: Prevent beds from exploding in dimensions like the Nether or End, configurable per world (defaults to vanilla behavior).
+- **Single Player Optimization**: Automatic night/storm skip when only one player (who isn't ignoring sleep) is online in a world.
 
 ### Safety & Reliability
-- **Overflow Protection**: Prevent time-related crashes and bugs
-- **Memory Management**: Automatic cleanup of unloaded worlds
-- **Input Validation**: Reject invalid speed configurations
+- **Overflow Protection**: Prevents potential time-related issues on servers with extremely high uptime by managing the underlying time values.
+- **Memory Management**: Automatic cleanup of data for unloaded worlds.
+- **Input Validation**: Rejects invalid command inputs like non-numeric speeds or invalid types.
+- **Pause Synchronization**: Resuming time correctly syncs with the current world time to avoid jumps if time was changed externally while paused.
 
 ## Getting Started
 
 ### Configuration
-Edit `plugins/TimeTuner/config.yml` to customize settings. Key options include:
+Edit `plugins/TimeTuner/config.yml` to customize settings. The available options are:
 
-```yaml
-global-speeds:
-  day-speed: 0.5
-  night-speed: 1.0
+**`global-speeds`**: Defines default time speeds used unless overridden in a specific world.
+* `day-speed`: (Number) Default multiplier for daytime speed. `1.0` = normal vanilla speed. Values `< 1.0` make the day longer (slower progression), values `> 1.0` make the day shorter (faster progression).
+* `night-speed`: (Number) Default multiplier for nighttime speed. `1.0` = normal vanilla speed. Values `< 1.0` make the night longer, values `> 1.0` make the night shorter.
 
-sleep:
-  allow-skip: true
-  percentage: 0.50
-  use-required-players: false
-  required-players: 3
+**`sleep`**: Global settings related to skipping the night or thunderstorms.
+* `allow-skip`: (`true`/`false`) Globally enables or disables the sleep skipping functionality.
+* `percentage`: (Decimal, e.g., `0.5`) The fraction (0.0 to 1.0) of online (non-ignored) players required to sleep for a skip, used if `use-required-players` is `false`.
+* `use-required-players`: (`true`/`false`) If `true`, the plugin uses the fixed `required-players` count instead of the `percentage`.
+* `required-players`: (Integer) The absolute number of players required to sleep for a skip, used if `use-required-players` is `true`.
 
-safety:
-  overflow-protection: true
-  precision-mode: true
+**`worlds`**: Contains subsections for each world where you want to override global settings.
+* `<world_name>`: (e.g., `world`, `world_nether`) Create a section named after the specific world folder.
+    * `enabled`: (`true`/`false`) Set to `false` to completely disable TimeTuner management (time speed, sleep rules) for this world. Vanilla gamerules will apply.
+    * `day-speed`: (Number) Overrides the `global-speeds.day-speed` specifically for this world.
+    * `night-speed`: (Number) Overrides the `global-speeds.night-speed` specifically for this world.
+    * `allow-bed-explosions`: (`true`/`false`) If `false`, prevents beds from exploding in this world (useful for Nether/End). Defaults to `true` (vanilla behavior).
+    * `allow-thunderstorm-sleep`: (`true`/`false`) If `true`, allows players to sleep during thunderstorms (vanilla behavior). If `false`, sleep is only possible at night. Defaults to `true`.
 
-advanced:
-  tick-frequency: 1
-  debug-mode: false
-  auto-pause-empty: false
-```
+**`safety`**: Settings related to plugin stability.
+* `overflow-protection`: (`true`/`false`) Recommended `true`. Helps prevent issues related to Minecraft's internal `fullTime` counter on servers with very long uptime.
+
+**`advanced`**: Settings for fine-tuning and debugging.
+* `tick-frequency`: (Integer, >= 1) How often, in server ticks, the plugin updates world time. `1` provides the smoothest time flow. Higher values update less frequently.
+* `debug-mode`: (`true`/`false`) Enables detailed logging in the server console, useful for troubleshooting.
+* `auto-pause-empty`: (`true`/`false`) If `true`, time progression automatically pauses in managed worlds when they have no players and resumes when a player enters.
 
 ## Commands
-| Command | Description |
-|---------|-------------|
-| `/timetuner help` | Show help message |
-| `/timetuner reload` | Reload configurations |
-| `/timetuner pause [world]` | Pause time in all or specific world |
-| `/timetuner resume [world]` | Resume time in all or specific world |
-| `/timetuner speed <day> <night>` | Set global speeds |
-| `/timetuner status` | Show current settings |
+| Command                          | Description                                                                         |
+|----------------------------------|-------------------------------------------------------------------------------------|
+| `/timetuner help`                | Show help message listing available commands.                                       |
+| `/timetuner reload`              | Reload the plugin's `config.yml` and `messages.yml`.                                |
+| `/timetuner pause [world]`       | Pause time progression in all managed worlds or just the specified `[world]`.         |
+| `/timetuner resume [world]`      | Resume time progression in all managed worlds or just the specified `[world]`.        |
+| `/timetuner speed <type> <speed> [world]` | Set time speed multiplier for `day`, `night`, or `both` to `<speed>` globally or only for `[world]`. |
+| `/timetuner reset [world]`       | Instantly skip to the start of the day (time 0) in all managed worlds or just `[world]`. Clears weather if skipping night/storm. |
+| `/timetuner status`              | Show current time, configured speeds, and paused status for all managed worlds.     |
 
 ## Directory Structure
 ```

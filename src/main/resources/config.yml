@@ -33,6 +33,8 @@ sleep:
 #   - day-speed: Custom day speed (overrides global setting)
 #   - night-speed: Custom night speed (overrides global setting)
 #   - enabled: true/false (whether time management is active)
+#   - allow-bed-explosions: true/false (whether bed explosions are allowed)
+#   - allow-thunderstorm-sleep: true/false (whether thunderstorms can be skipped by sleep)
 #
 # Note: Each world can be individually paused/resumed using commands:
 #   /timetuner pause <world>
@@ -40,27 +42,31 @@ sleep:
 # =====================================================
 worlds:
   world:
-    day-speed: 0.30    # Overrides global day-speed for this world only
-    night-speed: 0.5   # Overrides global night-speed for this world only
-    enabled: true      # Time management is active for this world
+    day-speed: 0.30
+    night-speed: 0.5
+    enabled: true
+    allow-bed-explosions: false
+    allow-thunderstorm-sleep: true
   
   world_nether:
-    day-speed: 1.0     # Will be used if this world is enabled
-    night-speed: 1.0   # Will be used if this world is enabled
-    enabled: false     # Time management is disabled for the nether
+    day-speed: 1.0
+    night-speed: 1.0
+    enabled: false
+    allow-bed-explosions: true
+    
   
   world_the_end:
-    day-speed: 1.0     # Will be used if this world is enabled
-    night-speed: 1.0   # Will be used if this world is enabled
-    enabled: false     # Time management is disabled for the end
-
+    day-speed: 1.0
+    night-speed: 1.0
+    enabled: false
+    allow-bed-explosions: true
+    
 # =====================================================
 # SAFETY FEATURES
 # =====================================================
 safety:
   overflow-protection: true  # Prevents time overflow issues (recommended)
-  precision-mode: true       # Enables precise time tracking
-
+  
 # =====================================================
 # ADVANCED SETTINGS
 # =====================================================
