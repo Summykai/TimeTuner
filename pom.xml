@@ -6,7 +6,7 @@
 
     <groupId>me.summykai</groupId>
     <artifactId>TimeTuner</artifactId>
-    <version>1.2.0-paper</version>
+    <version>1.2.1</version>
 
     <properties>
         <maven.compiler.source>21</maven.compiler.source>
@@ -25,7 +25,7 @@
         <dependency>
             <groupId>io.papermc.paper</groupId>
             <artifactId>paper-api</artifactId>
-            <version>1.21.4-R0.1-SNAPSHOT</version>
+            <version>1.21.8-R0.1-SNAPSHOT</version>
             <scope>provided</scope>
         </dependency>
         <dependency>
@@ -71,12 +71,18 @@
                 <artifactId>maven-checkstyle-plugin</artifactId>
                 <version>3.3.1</version>
                 <configuration>
-                    <configLocation>${project.basedir}/checkstyle.xml</configLocation>
-                    <encoding>UTF-8</encoding>
+                    <configLocation>checkstyle.xml</configLocation>
                     <consoleOutput>true</consoleOutput>
                     <failsOnError>true</failsOnError>
                     <linkXRef>false</linkXRef>
                 </configuration>
+                <dependencies>
+                    <dependency>
+                        <groupId>com.puppycrawl.tools</groupId>
+                        <artifactId>checkstyle</artifactId>
+                        <version>10.12.7</version>
+                    </dependency>
+                </dependencies>
                 <executions>
                     <execution>
                         <id>validate</id>
@@ -88,9 +94,7 @@
                 </executions>
             </plugin>
         </plugins>
-        
-        <!-- This plugin's configuration is used to store Eclipse m2e settings only -->
-        <!-- It has no influence on the Maven build itself -->
+
         <pluginManagement>
             <plugins>
                 <plugin>

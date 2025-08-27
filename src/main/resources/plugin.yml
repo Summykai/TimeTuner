@@ -1,5 +1,5 @@
 name: TimeTuner
-version: 1.1.0
+version: 1.2.1
 main: me.summykai.timetuner.TimeTuner
 api-version: 1.21
 authors: [summykai]

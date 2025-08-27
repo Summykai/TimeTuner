@@ -32,7 +32,7 @@ crash-reports/
 # Compiled class file
 *.class
 
-# Maven
+# Maven 
 target/
 pom.xml.tag
 pom.xml.releaseBackup

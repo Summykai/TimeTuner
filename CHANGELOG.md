@@ -2,14 +2,24 @@
 
 ---
 
+## Version 1.2.1 (2025-08-27)
+
+### Maintenance
+
+- **Compatibility:** Updated the Paper API dependency to support Minecraft 1.21.8. This ensures compatibility with the latest server builds and APIs.
+
+---
+
 ## Version 1.2.0 (2025-04-08)
 
 ### Features
+
 - **Thunderstorm Sleep:** Players can now sleep to skip thunderstorms, even during the day, if enabled via the new `allow-thunderstorm-sleep` world configuration option.
   - Configurable per-world in `config.yml` under the `worlds.<world_name>` section. Defaults to `true`.
 - **Weather Clearing on Sleep Skip:** When enough players sleep to skip the night (or a thunderstorm), the weather in that world will now automatically be cleared (both rain/storm and thunder).
 
 ### Improvements
+
 - **Sleep Logic Robustness:**
   - Sleep checks now correctly ignore players with the `isSleepingIgnored` flag (e.g., players in spectator mode).
   - Sleep skip checks are now scheduled 1 tick after bed entry to ensure player state is consistent.
@@ -22,4 +32,5 @@
 - **Configuration:** Added comments in `config.yml` explaining the new world options (`allow-bed-explosions` and `allow-thunderstorm-sleep`).
 
 ### Fixes
+
 - Player state changes (leaving bed, quitting, changing worlds) now more reliably remove players from the internal sleeping player cache.
